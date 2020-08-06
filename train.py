@@ -11,11 +11,12 @@ tf.app.flags.DEFINE_float('learning_rate', 0.00001, '')
 tf.app.flags.DEFINE_integer('max_steps', 100000, '')
 tf.app.flags.DEFINE_float('moving_average_decay', 0.997, '')
 tf.app.flags.DEFINE_string('gpu_list', '0', '')
-tf.app.flags.DEFINE_string('checkpoint_path', './resnet_train/', '')
-tf.app.flags.DEFINE_boolean('restore', False, 'whether to resotre from checkpoint')
+tf.app.flags.DEFINE_string('checkpoint_path', '/content/model/', '')
+tf.app.flags.DEFINE_boolean('restore', True, 'whether to resotre from checkpoint')
 tf.app.flags.DEFINE_integer('save_checkpoint_steps', 1000, '')
 tf.app.flags.DEFINE_integer('save_summary_steps', 100, '')
-tf.app.flags.DEFINE_string('pretrained_model_path', None, '')
+tf.app.flags.DEFINE_string('pretrained_model_path', '/content/tensorflow_PSENet/data/resnet_v1_50.ckpt', '')
+tf.app.flags.DEFINE_string('save_checkpoint_steps_to_drive', '/content/drive/My Drive/dataset/PSENet/', '')
 
 from nets import model
 from utils.data_provider import data_provider
@@ -25,6 +26,7 @@ FLAGS = tf.app.flags.FLAGS
 gpus = list(range(len(FLAGS.gpu_list.split(','))))
 
 logger.setLevel(cfg.debug)
+
 
 def tower_loss(images, seg_maps_gt, training_masks, reuse_variables=None):
     # Build inference graph
@@ -79,13 +81,13 @@ def main(argv=None):
     input_training_masks = tf.placeholder(tf.float32, shape=[None, None, None, 1], name='input_training_masks')
 
     global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
-    learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, decay_steps=10000, decay_rate=0.94, staircase=True)
+    learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, decay_steps=10000, decay_rate=0.94,
+                                               staircase=True)
     # add summary
     tf.summary.scalar('learning_rate', learning_rate)
     # opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9)
     opt = tf.train.AdamOptimizer(learning_rate)
     # opt = tf.train.MomentumOptimizer(learning_rate, 0.9)
-
 
     # split
     input_images_split = tf.split(input_images, len(gpus))
@@ -125,10 +127,11 @@ def main(argv=None):
     init = tf.global_variables_initializer()
 
     if FLAGS.pretrained_model_path is not None:
-        variable_restore_op = slim.assign_from_checkpoint_fn(FLAGS.pretrained_model_path, slim.get_trainable_variables(),
+        variable_restore_op = slim.assign_from_checkpoint_fn(FLAGS.pretrained_model_path,
+                                                             slim.get_trainable_variables(),
                                                              ignore_missing_vars=True)
-    gpu_options=tf.GPUOptions(allow_growth=True)
-    #gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.75)
+    gpu_options = tf.GPUOptions(allow_growth=True)
+    # gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.75)
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)) as sess:
         if FLAGS.restore:
             logger.info('continue training from previous checkpoint')
@@ -139,6 +142,7 @@ def main(argv=None):
             sess.run(init)
             if FLAGS.pretrained_model_path is not None:
                 variable_restore_op(sess)
+                print("FLAGS.pretrained_model_path", FLAGS.pretrained_model_path)
 
         data_generator = data_provider.get_batch(num_workers=FLAGS.num_readers,
                                                  input_size=FLAGS.input_size,
@@ -150,25 +154,30 @@ def main(argv=None):
             ml, tl, _ = sess.run([model_loss, total_loss, train_op], feed_dict={input_images: data[0],
                                                                                 input_seg_maps: data[2],
                                                                                 input_training_masks: data[3]})
+            # print("tl", tl)
             if np.isnan(tl):
                 logger.error('Loss diverged, stop training')
                 break
 
             if step % 10 == 0:
-                avg_time_per_step = (time.time() - start)/10
-                avg_examples_per_second = (10 * FLAGS.batch_size_per_gpu * len(gpus))/(time.time() - start)
+                avg_time_per_step = (time.time() - start) / 10
+                avg_examples_per_second = (10 * FLAGS.batch_size_per_gpu * len(gpus)) / (time.time() - start)
                 start = time.time()
-                logger.info('Step {:06d}, model loss {:.4f}, total loss {:.4f}, {:.2f} seconds/step, {:.2f} examples/second'.format(
-                    step, ml, tl, avg_time_per_step, avg_examples_per_second))
+                logger.info(
+                    'Step {:06d}, model loss {:.4f}, total loss {:.4f}, {:.2f} seconds/step, {:.2f} examples/second'.format(
+                        step, ml, tl, avg_time_per_step, avg_examples_per_second))
 
             if step % FLAGS.save_checkpoint_steps == 0:
-                saver.save(sess, os.path.join(FLAGS.checkpoint_path, 'model.ckpt'), global_step=global_step)
+                saver.save(sess, os.path.join(FLAGS.save_checkpoint_steps_to_drive, 'model.ckpt'),
+                           global_step=global_step)
 
             if step % FLAGS.save_summary_steps == 0:
                 _, tl, summary_str = sess.run([train_op, total_loss, summary_op], feed_dict={input_images: data[0],
                                                                                              input_seg_maps: data[2],
-                                                                                             input_training_masks: data[3]})
+                                                                                             input_training_masks: data[
+                                                                                                 3]})
                 summary_writer.add_summary(summary_str, global_step=step)
+
 
 if __name__ == '__main__':
     tf.app.run()
