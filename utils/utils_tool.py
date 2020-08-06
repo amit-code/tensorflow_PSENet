@@ -1,6 +1,6 @@
 import logging
 from easydict import EasyDict as edict
-import Queue
+
 import numpy as np
 import cv2
 
@@ -19,6 +19,7 @@ __C.debug = logging.DEBUG
 
 
 def pse(kernals, min_area=5):
+    import queue
     '''
     reference https://github.com/whai362/PSENet/issues/15
     :param kernals:
@@ -39,8 +40,8 @@ def pse(kernals, min_area=5):
             continue
         label_values.append(label_idx)
 
-    queue = Queue.Queue(maxsize=0)
-    next_queue = Queue.Queue(maxsize=0)
+    queue = queue.Queue(maxsize=0)
+    next_queue = queue.Queue(maxsize=0)
     points = np.array(np.where(label > 0)).transpose((1, 0))
 
 
