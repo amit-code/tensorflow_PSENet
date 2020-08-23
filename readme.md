@@ -65,6 +65,14 @@ cl pse.cpp /I ./include /I "C:\Python36\include" /LD /Fe:pse.pyd /link/LIBPATH:"
 This will generate required files for Windows execution/testing
 
 
+**Note** 
+please make sure you comment some code in __init__.py in pse folder
+comment line 8 and 9
+
+if subprocess.call(['make', '-C', BASE_DIR]) != 0:  # return value
+    raise RuntimeError('Cannot compile pse: {}'.format(BASE_DIR))
+    
+    
 ### Examples
 ![result0](figure/result0.jpg)
 ![result1](figure/result1.jpg)
