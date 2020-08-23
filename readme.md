@@ -53,6 +53,18 @@ python eval.py --test_data_path=./tmp/images/ --gpu_list=0 --checkpoint_path=./r
 
 a text file and result image will be then written to the output path.
 
+**Test Execution on Windows Environment**
+
+Before executing above mentioned commands,
+
+Open the x64 or x32 Visual Studio developer command prompt (or Native Tools Command Prompt) in Windows 10 and use the following command to generate the pse.pyd file:
+first cd into pse folder to execute below command in command prompt,
+
+cl pse.cpp /I ./include /I "C:\Python36\include" /LD /Fe:pse.pyd /link/LIBPATH:"C:\Python36\libs" 
+
+This will generate required files for Windows execution/testing
+
+
 ### Examples
 ![result0](figure/result0.jpg)
 ![result1](figure/result1.jpg)
